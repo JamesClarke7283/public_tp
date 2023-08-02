@@ -12,11 +12,13 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
             local event = minetest.explode_textlist_event(fields.places)
             minetest.log("action", "Event: " .. minetest.serialize(event))
             if event.type == "CHG" then
-                if event.text then
-                    minetest.log("action", "Selected text: " .. event.text)
+                local all_places = get_all_places()
+                local selected_text = all_places[event.index] and all_places[event.index].text
+                if selected_text then
+                    minetest.log("action", "Selected text: " .. selected_text)
                     -- Parse the place name and player name from the selected place string
-                    for _, place in ipairs(get_all_places()) do
-                        if place.text == event.text then
+                    for _, place in ipairs(all_places) do
+                        if place.text == selected_text then
                             selected_place[player_name] = {name = place.name, owner = place.owner}
                             minetest.log("action", "Player " .. player_name .. " selected place: " .. minetest.serialize(selected_place[player_name]))
                             break
