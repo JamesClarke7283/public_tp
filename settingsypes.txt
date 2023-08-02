@@ -1,0 +1,2 @@
+public_tp_limit (Public TP limit) int 2
+public_tp_extra_limit (Public TP extra limit) int 5

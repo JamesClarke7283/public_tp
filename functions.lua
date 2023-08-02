@@ -1,96 +1,110 @@
--- functions.lua
+function get_number_of_owned_places(player_name)
+    local count = 0
+    for _, place in ipairs(get_all_places()) do
+        if place.owner == player_name then
+            count = count + 1
+        end
+    end
+    return count
+end
 
--- Converts a vector to a string in the form "x_y_z"
+
+function print_storage()
+    for key, value in pairs(public_tp_mod_storage:to_table().fields) do
+        local data = minetest.deserialize(value)
+        minetest.log("action", "Key: " .. key .. ", Value: " .. minetest.serialize(data))
+    end
+end
+
+
+-- Converts a position to a string
 function pos_to_string(pos)
-    -- Make sure that the position data is not nil
-    if pos == nil or next(pos) == nil then
-        minetest.log("error", "Attempted to convert nil or empty position to string")
-        return nil
-    end
-
-    -- Make sure that each component of the position data is not nil
-    local x = pos.x or 0
-    local y = pos.y or 0
-    local z = pos.z or 0
-
-    return math.floor(x) .. " " .. math.floor(y) .. " " .. math.floor(z)
+    minetest.log("action", "Converting position to string: " .. minetest.serialize(pos))
+    local str = pos.x .. "_" .. pos.y .. "_" .. pos.z
+    minetest.log("action", "Converted position to string: " .. str)
+    return str
 end
 
--- Converts a string in the form "x_y_z" to a vector
+-- Converts a string to a position
 function string_to_pos(str)
-    local x, y, z = str:match("([^ ]+)_([^ ]+)_([^ ]+)")
-    return {x = tonumber(x), y = tonumber(y), z = tonumber(z)}
-end
-
--- Sets a new place in the mod storage
-function set_place(name, pos, owner)
-    local place_data = pos_to_string(pos) .. ";" .. owner
-    public_tp_mod_storage:set_string(name, place_data)
-    minetest.log("action", "set_place called with: " .. name .. ", " .. pos_to_string(pos) .. ", " .. owner)
-end
-
--- Gets a place from the mod storage
-function get_place(name)
-    local place_data = public_tp_mod_storage:get_string(name)
-    if place_data == "" then
+    minetest.log("action", "Converting string to position: " .. str)
+    local x, y, z = string.match(str, "^([^_]+)_([^_]+)_([^_]+)$")
+    if x and y and z then
+        local pos = {x = tonumber(x), y = tonumber(y), z = tonumber(z)}
+        minetest.log("action", "Converted string to position: " .. minetest.serialize(pos))
+        return pos
+    else
+        minetest.log("error", "Failed to convert string to position: " .. str)
         return nil
     end
-    local pos_string, owner = place_data:match("([^;]+);([^;]+)")
-    return {pos = string_to_pos(pos_string), owner = owner}
 end
 
--- Deletes a place from the mod storage
+-- Fetches the place by name from the storage and returns it
+function get_place(name)
+    minetest.log("action", "Getting place: " .. name)
+    local place_string = public_tp_mod_storage:get_string(name)
+    if place_string == "" then
+        minetest.log("error", "No place found with name: " .. name)
+        return nil
+    end
+    local pos, owner, text = string.match(place_string, "^([^;]+);([^;]+);([^;]+)$")
+    if pos and owner then
+        local place = {name = name, pos = string_to_pos(pos), owner = owner, text = text}
+        minetest.log("action", "Retrieved place: " .. minetest.serialize(place))
+        return place
+    else
+        minetest.log("error", "Failed to parse place: " .. place_string)
+        return nil
+    end
+end
+
+-- Stores a place in the storage
+function set_place(name, pos, owner)
+    minetest.log("action", "Setting place with name: " .. name .. ", position: " .. minetest.serialize(pos) .. ", owner: " .. owner)
+    local display_text = '"' .. name .. '" Created By "' .. owner .. '"'
+    local place_string = pos_to_string(pos) .. ";" .. owner .. ";" .. display_text
+    public_tp_mod_storage:set_string(name, place_string)
+    minetest.log("action", "Set place: " .. name)
+    minetest.log("action", "Place data: " .. place_string)
+    minetest.log("action", "Display text: " .. display_text) -- Additional log to check the display text
+end
+
+
+-- Deletes a place from the storage
 function delete_place(name)
+    minetest.log("action", "Deleting place: " .. name)
     public_tp_mod_storage:set_string(name, "")
 end
 
--- Handles adding a new place
+-- Fetches all places from the storage and returns them
+function get_all_places()
+    minetest.log("action", "Getting all places")
+    local places = {}
+    for name, entry in pairs(public_tp_mod_storage:to_table().fields) do
+        local pos, owner, text = string.match(entry, "^([^;]+);([^;]+);([^;]+)$")
+        if pos and owner then
+            local place = {name = name, pos = string_to_pos(pos), owner = owner, text = text}
+            table.insert(places, place)
+        else
+            minetest.log("error", "Failed to parse place: " .. entry)
+        end
+    end
+    minetest.log("action", "Retrieved all places: " .. minetest.serialize(places))
+    return places
+end
+
+
+-- Handles the addition of a new place
 function handle_add_place(player_name, place_name)
+    minetest.log("action", "Handling addition of place: " .. place_name)
     local player = minetest.get_player_by_name(player_name)
     if player then
-        local pos = player:get_pos()
-        if pos then
-            minetest.log("action", "handle_add_place called with: " .. player_name .. ", " .. place_name .. ", position: " .. pos_to_string(pos))
-            set_place(place_name, pos, player_name)
-        else
-            minetest.log("error", "get_pos returned nil for player: " .. player_name)
-        end
+        set_place(place_name, player:get_pos(), player_name)
     end
 end
 
--- Handles teleporting to a place
-function handle_teleport(player_name, place_name)
-    minetest.log("action", "handle_teleport called with: " .. player_name .. ", " .. (place_name or "nil"))
-    local place = get_place(place_name)
-    if place then
-        local player = minetest.get_player_by_name(player_name)
-        if player then
-            player:set_pos(place.pos)
-        end
-    end
-end
-
--- Handles deleting a place
+-- Handles the deletion of a place
 function handle_delete_place(place_name)
-    minetest.log("action", "handle_delete_place called with: " .. (place_name or "nil"))
+    minetest.log("action", "Handling deletion of place: " .. place_name)
     delete_place(place_name)
-end
-
--- Gets all places
-function get_all_places()
-    local places = {}
-    local storage_table = public_tp_mod_storage:to_table().fields
-
-    if not storage_table then
-        return places
-    end
-
-    for key, _ in pairs(storage_table) do
-        local place = get_place(key)
-        if place then
-            places[#places+1] = {name = key, pos = place.pos, owner = place.owner}
-        end
-    end
-
-    return places
 end
