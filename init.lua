@@ -1,5 +1,5 @@
 -- Load additional Lua files
-local modname = minetest.get_current_modname()
+modname = minetest.get_current_modname()
 
 dofile(minetest.get_modpath(modname) .. "/functions.lua")
 dofile(minetest.get_modpath(modname) .. "/formspecs.lua")

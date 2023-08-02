@@ -13,12 +13,12 @@ function pos_to_string(pos)
     local y = pos.y or 0
     local z = pos.z or 0
 
-    return x .. "_" .. y .. "_" .. z
+    return math.floor(x) .. " " .. math.floor(y) .. " " .. math.floor(z)
 end
 
 -- Converts a string in the form "x_y_z" to a vector
 function string_to_pos(str)
-    local x, y, z = str:match("([^_]+)_([^_]+)_([^_]+)")
+    local x, y, z = str:match("([^ ]+)_([^ ]+)_([^ ]+)")
     return {x = tonumber(x), y = tonumber(y), z = tonumber(z)}
 end
 
