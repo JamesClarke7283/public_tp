@@ -1,58 +1,69 @@
--- init.lua
+-- Load additional Lua files
+local modname = minetest.get_current_modname()
 
-modname = minetest.get_current_modname()
-
--- Load other files
 dofile(minetest.get_modpath(modname) .. "/functions.lua")
-dofile(minetest.get_modpath(modname) .. "/formspec.lua")
+dofile(minetest.get_modpath(modname) .. "/formspecs.lua")
 
--- Create a global mod_storage variable
+-- Global storage
 public_tp_mod_storage = minetest.get_mod_storage()
 
-places_list = get_all_places() or {}
+-- Selected place table to store the selected place index for each player
+local selected_place = {}
 
-local function on_player_receive_fields(player, formname, fields)
+-- Chat command to open the teleport GUI
+minetest.register_chatcommand("public_tp", {
+    description = "Open the teleport GUI",
+    func = function(name)
+        local player = minetest.get_player_by_name(name)
+        if player then
+            minetest.show_formspec(name, "public_tp:main_formspec", get_main_formspec(name))
+        end
+    end
+})
+
+-- This function is called when a player sends a form submission.
+minetest.register_on_player_receive_fields(function(player, formname, fields)
     local player_name = player:get_player_name()
-
-    minetest.log("action", "Entered minetest.register_on_player_receive_fields function. Form name: " .. formname)
+    print("Entered minetest.register_on_player_receive_fields function. Form name: " .. formname)
 
     if formname == "public_tp:main_formspec" then
-        local selected_place = places_list[tonumber(fields.selected_place)]
-        if selected_place then
-            if fields.teleport then
-                handle_teleport(player_name, selected_place.name)
-            elseif fields.delete then
-                minetest.show_formspec(player_name, "public_tp:delete_confirmation", get_delete_confirmation_formspec(selected_place.name))
+        if fields.places then
+            local event = minetest.explode_textlist_event(fields.places)
+            if event.type == "CHG" then
+                selected_place[player_name] = event.index
             end
-        else
-            minetest.log("error", "No place selected.")
+        end
+
+        if fields.teleport and selected_place[player_name] then
+            local place = get_place(player_name, selected_place[player_name])
+            if place then
+                local pos = string_to_pos(place.pos)
+                player:set_pos(pos)
+            end
+        end
+
+        if fields.delete and selected_place[player_name] then
+            minetest.show_formspec(player_name, "public_tp:delete_confirm_formspec", get_delete_confirm_formspec(selected_place[player_name]))
         end
 
         if fields.add_place then
-            minetest.show_formspec(player_name, "public_tp:add_place_formspec", get_add_place_formspec())
+            minetest.show_formspec(player_name, "public_tp:add_place_formspec", get_add_place_formspec(player_name))
         end
     elseif formname == "public_tp:add_place_formspec" then
-        if fields.save and fields.place_name then
-            minetest.log("action", "Save button pressed with place name: " .. fields.place_name)
-            handle_add_place(player_name, fields.place_name)
-            places_list = get_all_places() -- Update places list after adding new place
-            minetest.show_formspec(player_name, "public_tp:main_formspec", get_main_formspec())
+        if fields.save and fields.name then
+            print("Save button pressed with place name: " .. fields.name)
+            handle_add_place(player, fields.name)
+            minetest.show_formspec(player_name, "public_tp:main_formspec", get_main_formspec(player_name)) -- Show the main formspec again
         end
-    elseif formname == "public_tp:delete_confirmation" then
-        if fields.confirm_delete then
-            local selected_place = fields.place_to_delete
-            handle_delete_place(selected_place)
-            places_list = get_all_places() -- Update places list after deleting place
-            minetest.show_formspec(player_name, "public_tp:main_formspec", get_main_formspec())
+    elseif formname == "public_tp:delete_confirm_formspec" then
+        local selected_place_index = tonumber(fields.confirm_delete)
+        if selected_place_index and selected_place[player_name] then
+            local place = get_place(player_name, selected_place[player_name])
+            if place then
+                handle_delete_place(place.name)
+                selected_place[player_name] = nil
+                minetest.show_formspec(player_name, "public_tp:main_formspec", get_main_formspec(player_name))
+            end
         end
     end
-end
-
-minetest.register_on_player_receive_fields(on_player_receive_fields)
-
-minetest.register_chatcommand("public_tp", {
-    func = function(player_name, param)
-        places_list = get_all_places() -- Fill the places list
-        minetest.show_formspec(player_name, "public_tp:main_formspec", get_main_formspec())
-    end
-})
+end)
