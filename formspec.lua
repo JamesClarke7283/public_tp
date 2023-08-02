@@ -1,13 +1,20 @@
 -- formspec.lua
 
 function get_main_formspec(player_name)
-    local places = get_all_places()
+    local places = places_list
     local place_rows = {}
     local place_options = {}
+    
+    minetest.log("action", "places: " .. minetest.serialize(places))
 
-    for name, place in pairs(places) do
-        place_rows[#place_rows + 1] = minetest.formspec_escape(name) .. "," .. pos_to_string(place.pos) .. "," .. minetest.formspec_escape(place.owner)
-        table.insert(place_options, minetest.formspec_escape(name))
+    for i, place in ipairs(places) do
+        local pos_string = pos_to_string(place.pos)
+        if pos_string then
+            place_rows[#place_rows + 1] = minetest.formspec_escape(place.name) .. "," .. pos_string .. "," .. minetest.formspec_escape(place.owner)
+            table.insert(place_options, minetest.formspec_escape(place.name))
+        else
+            minetest.log("error", "Invalid position data for place: " .. place.name)
+        end
     end
 
     if #place_rows > 0 then
@@ -18,7 +25,7 @@ function get_main_formspec(player_name)
             "tableoptions[background=#00000000;border=false]",
             "table[0,0;10,7;places;Name,Position,Owner;",
             table.concat(place_rows, ";"),
-            ";1]",
+            ";0]",
             "dropdown[0.5,8;4;selected_place;" .. table.concat(place_options, ",") .. ";1]",
             "button[4.5,7.5;2,1;teleport;Teleport]",
             "button[6.5,7.5;2,1;delete;Delete]",
@@ -38,7 +45,6 @@ function get_main_formspec(player_name)
     end
 end
 
-
 function get_add_place_formspec(player_name)
     local formspec = {
         "formspec_version[4]",
@@ -49,7 +55,6 @@ function get_add_place_formspec(player_name)
 
     return table.concat(formspec, "")
 end
-
 
 function get_delete_confirmation_formspec(place_name)
     local formspec = {

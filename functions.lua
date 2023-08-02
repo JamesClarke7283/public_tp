@@ -1,13 +1,24 @@
 -- functions.lua
 
--- Converts a vector to a string in the form "x,y,z"
+-- Converts a vector to a string in the form "x_y_z"
 function pos_to_string(pos)
-    return tostring(pos.x) .. "," .. tostring(pos.y) .. "," .. tostring(pos.z)
+    -- Make sure that the position data is not nil
+    if pos == nil or next(pos) == nil then
+        minetest.log("error", "Attempted to convert nil or empty position to string")
+        return nil
+    end
+
+    -- Make sure that each component of the position data is not nil
+    local x = pos.x or 0
+    local y = pos.y or 0
+    local z = pos.z or 0
+
+    return x .. "_" .. y .. "_" .. z
 end
 
--- Converts a string in the form "x,y,z" to a vector
-function string_to_pos(pos_string)
-    local x, y, z = pos_string:match("([^,]+),([^,]+),([^,]+)")
+-- Converts a string in the form "x_y_z" to a vector
+function string_to_pos(str)
+    local x, y, z = str:match("([^_]+)_([^_]+)_([^_]+)")
     return {x = tonumber(x), y = tonumber(y), z = tonumber(z)}
 end
 
@@ -38,18 +49,22 @@ function handle_add_place(player_name, place_name)
     local player = minetest.get_player_by_name(player_name)
     if player then
         local pos = player:get_pos()
-        minetest.log("action", "handle_add_place called with: " .. player_name .. ", " .. place_name)
-        set_place(place_name, pos, player_name)
+        if pos then
+            minetest.log("action", "handle_add_place called with: " .. player_name .. ", " .. place_name .. ", position: " .. pos_to_string(pos))
+            set_place(place_name, pos, player_name)
+        else
+            minetest.log("error", "get_pos returned nil for player: " .. player_name)
+        end
     end
 end
 
 -- Handles teleporting to a place
 function handle_teleport(player_name, place_name)
+    minetest.log("action", "handle_teleport called with: " .. player_name .. ", " .. (place_name or "nil"))
     local place = get_place(place_name)
     if place then
         local player = minetest.get_player_by_name(player_name)
         if player then
-            minetest.log("action", "handle_teleport called with: " .. player_name .. ", " .. place_name)
             player:set_pos(place.pos)
         end
     end
@@ -57,18 +72,25 @@ end
 
 -- Handles deleting a place
 function handle_delete_place(place_name)
-    minetest.log("action", "handle_delete_place called with: " .. place_name)
+    minetest.log("action", "handle_delete_place called with: " .. (place_name or "nil"))
     delete_place(place_name)
 end
 
 -- Gets all places
 function get_all_places()
     local places = {}
-    for _, key in ipairs(public_tp_mod_storage:to_table().fields) do
+    local storage_table = public_tp_mod_storage:to_table().fields
+
+    if not storage_table then
+        return places
+    end
+
+    for key, _ in pairs(storage_table) do
         local place = get_place(key)
         if place then
             places[#places+1] = {name = key, pos = place.pos, owner = place.owner}
         end
     end
+
     return places
 end
